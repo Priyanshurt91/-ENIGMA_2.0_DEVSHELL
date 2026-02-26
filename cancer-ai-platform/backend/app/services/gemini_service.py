@@ -1,27 +1,21 @@
-"""
-Gemini Service — calls Google Gemini API to generate polished clinical reports.
-"""
+import asyncio
+import httpx
 from app.config import settings
 from app.core.logging import logger
 
-_model = None
+_is_ready = False
 
 
 def initialize():
-    """Initialize the Gemini API client."""
-    global _model
+    """Verify API key configuration."""
+    global _is_ready
     if not settings.GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY not set. Gemini report generation disabled.")
+        _is_ready = False
         return
-
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        _model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        logger.info(f"Gemini API initialized with model: {settings.GEMINI_MODEL}")
-    except Exception as e:
-        logger.error(f"Gemini initialization failed: {e}")
-        _model = None
+        
+    logger.info(f"Gemini REST API initialized for model: {settings.GEMINI_MODEL}")
+    _is_ready = True
 
 
 async def generate_report(
@@ -30,18 +24,9 @@ async def generate_report(
     patient_info: dict = None,
 ) -> dict | None:
     """
-    Generate a polished clinical report using Gemini API.
-
-    Args:
-        prediction_data: {cancer_type, predicted_class, confidence, risk_score, probabilities}
-        rag_context: list of relevant medical knowledge passages from RAG
-        patient_info: {patient_id, name, age, biomarkers}
-
-    Returns:
-        dict with sections: {indication, technique, findings, impression, recommendation, executive_summary}
-        or None if Gemini is unavailable
+    Generate a polished clinical report using Gemini's REST API.
     """
-    if _model is None:
+    if not _is_ready:
         return None
 
     # Build the prompt
@@ -65,7 +50,7 @@ Age: {patient_info.get('age', 'N/A')}
 - Predicted Class: {prediction_data.get('predicted_class', 'Unknown')}
 - Confidence: {prediction_data.get('confidence', 0)}%
 - Risk Score: {prediction_data.get('risk_score', 0)}%
-- Class Probabilities: {prediction_data.get('probabilities', {{}})}
+- Class Probabilities: {prediction_data.get('probabilities', dict())}
 
 ## PATIENT INFORMATION
 {patient_text if patient_text else "Not provided"}
@@ -94,13 +79,32 @@ Important:
 Return ONLY valid JSON with these section keys and string values.
 """
 
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.2
+        }
+    }
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+
     try:
-        response = _model.generate_content(prompt)
-        text = response.text.strip()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            
+            data = response.json()
+            # Extract text from the Gemini REST response format
+            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
         # Try to parse as JSON
         import json
-        # Clean up markdown code blocks if present
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):
@@ -111,7 +115,6 @@ Return ONLY valid JSON with these section keys and string values.
             sections = json.loads(text)
             return sections
         except json.JSONDecodeError:
-            # Return as full text if not valid JSON
             return {
                 "executive_summary": text[:300],
                 "indication": "AI-assisted cancer screening analysis",
@@ -124,5 +127,5 @@ Return ONLY valid JSON with these section keys and string values.
             }
 
     except Exception as e:
-        logger.error(f"Gemini report generation failed: {e}")
+        logger.error(f"Gemini REST report generation failed: {e}")
         return None

@@ -40,8 +40,8 @@ async def analyze(
 
     patient_info = {
         "patient_id": patient_id,
-        "name": patient_name,
-        "age": patient_age,
+        "patient_name": patient_name,
+        "patient_age": patient_age,
     }
 
     result = await radiology_service.analyze_image(

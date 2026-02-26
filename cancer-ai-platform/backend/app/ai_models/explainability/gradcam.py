@@ -50,12 +50,23 @@ class GradCAM:
         img_tensor = preprocess(image.convert("RGB")).unsqueeze(0).to(device)
         img_tensor.requires_grad = True
 
+        # Need to temporarily ensure gradients are enabled for the model
+        prev_training_state = self.model.training
+        self.model.eval()
+        for param in self.model.parameters():
+            param.requires_grad_(True)
+
         output = self.model(img_tensor)
         if target_class is None:
             target_class = output.argmax(dim=1).item()
 
         self.model.zero_grad()
         output[0, target_class].backward()
+
+        # Restore original state
+        if not prev_training_state:
+            for param in self.model.parameters():
+                param.requires_grad_(False)
 
         if self.gradients is None or self.activations is None:
             # Fallback: return a simple center-focused heatmap

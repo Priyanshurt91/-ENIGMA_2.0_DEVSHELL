@@ -7,6 +7,8 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
     const [selectedType, setSelectedType] = useState("lung");
     const [uploadState, setUploadState] = useState("idle");
     const [progress, setProgress] = useState(0);
+    const [errorMsg, setErrorMsg] = useState("");
+    const progressIntervalRef = useRef(null);
     const [selectedFile, setSelectedFile] = useState(null);
     const [patientInfo, setPatientInfo] = useState({ patient_id: "", patient_name: "", patient_age: "" });
     const [biomarkers, setBiomarkers] = useState({ wbc: "", blast: "", hgb: "", plt: "" });
@@ -27,27 +29,57 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
         if (!selectedFile) { fileRef.current?.click(); return; }
         setUploadState("uploading");
         setProgress(0);
+        setErrorMsg("");
 
-        // Animate progress
+        // Phase 1: 0 → 40% (upload phase)
         let p = 0;
-        const interval = setInterval(() => { p += 3; setProgress(Math.min(p, 40)); if (p >= 40) clearInterval(interval); }, 80);
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = setInterval(() => {
+            p += 3;
+            setProgress(Math.min(p, 40));
+            if (p >= 40) clearInterval(progressIntervalRef.current);
+        }, 80);
+
+        // Merge state with placeholder defaults if empty
+        const finalPatientInfo = {
+            patient_id: patientInfo.patient_id || "PT-0041",
+            patient_name: patientInfo.patient_name || "Ananya Sharma",
+            patient_age: patientInfo.patient_age || "54",
+        };
+        const finalBiomarkers = {
+            wbc: biomarkers.wbc || "4.5",
+            blast: biomarkers.blast || "0",
+            hgb: biomarkers.hgb || "14.2",
+            plt: biomarkers.plt || "280",
+        };
+
+        // Phase 2: 40 → 90% (analysis phase — slow crawl)
+        setUploadState("analyzing");
+        let p2 = 40;
+        progressIntervalRef.current = setInterval(() => {
+            p2 += 0.4;
+            setProgress(Math.min(p2, 90));
+            if (p2 >= 90) clearInterval(progressIntervalRef.current);
+        }, 120);
 
         try {
-            setUploadState("analyzing");
             let res;
             if (selectedType === "blood") {
-                res = await analyzePathology(selectedFile, patientInfo, biomarkers);
+                res = await analyzePathology(selectedFile, finalPatientInfo, finalBiomarkers);
             } else {
-                res = await analyzeRadiology(selectedFile, selectedType, scanTypeMap[selectedType], patientInfo);
+                res = await analyzeRadiology(selectedFile, selectedType, scanTypeMap[selectedType], finalPatientInfo);
             }
+            clearInterval(progressIntervalRef.current);
             setProgress(100);
             setUploadState("done");
             if (onAnalysisComplete) onAnalysisComplete(res.data);
         } catch (err) {
+            clearInterval(progressIntervalRef.current);
             console.error("Analysis failed:", err);
-            // Fallback: simulate completion for demo
-            setProgress(100);
-            setTimeout(() => setUploadState("done"), 600);
+            const msg = err?.response?.data?.detail || err?.message || "Backend unreachable";
+            setErrorMsg(msg);
+            setUploadState("error");
+            setProgress(0);
         }
     }
 
@@ -140,9 +172,20 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
                                     {uploadState === "uploading" ? "Uploading scan..." : "AI Inference running..."}
                                 </div>
                                 <div style={{ height: 4, background: "#0d1a0d", borderRadius: 2, overflow: "hidden", margin: "0 20px" }}>
-                                    <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg, #00ff88, #00b4ff)", borderRadius: 2, transition: "width 0.15s" }} />
+                                    <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg, #00ff88, #00b4ff)", borderRadius: 2, transition: "width 0.3s ease" }} />
                                 </div>
                                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#3a5a3a", marginTop: 6 }}>{Math.round(progress)}%</div>
+                            </div>
+                        )}
+                        {uploadState === "error" && (
+                            <div>
+                                <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+                                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#ff4444", marginBottom: 8 }}>Analysis Failed</div>
+                                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#aa4444", marginBottom: 12 }}>{errorMsg}</div>
+                                <button onClick={() => { setUploadState("idle"); setErrorMsg(""); }} style={{
+                                    padding: "8px 20px", background: "rgba(255,68,68,0.1)", border: "1px solid #ff444444",
+                                    borderRadius: 6, color: "#ff6666", fontFamily: "'DM Mono', monospace", fontSize: 11, cursor: "pointer",
+                                }}>↺ Retry</button>
                             </div>
                         )}
                         {uploadState === "done" && (

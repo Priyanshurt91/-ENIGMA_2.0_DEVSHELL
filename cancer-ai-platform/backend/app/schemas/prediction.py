@@ -28,6 +28,7 @@ class PredictionResponse(BaseModel):
     risk_level: str
     probabilities: Optional[dict] = None
     heatmap_path: Optional[str] = None
+    image_path: Optional[str] = None
     biomarkers: Optional[dict] = None
     created_at: datetime
 

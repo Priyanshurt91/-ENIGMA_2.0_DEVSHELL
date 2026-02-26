@@ -3,6 +3,7 @@ Pathology Service — handles blood cancer analysis from blood slide images.
 """
 import os
 import uuid
+import asyncio
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -31,8 +32,8 @@ async def analyze_blood_slide(
     img_path = os.path.join(settings.UPLOAD_DIR, img_filename)
     image.save(img_path)
 
-    # Run blood cancer inference
-    result = predict(image)
+    # Run blood cancer inference in a thread to avoid blocking
+    result = await asyncio.to_thread(predict, image)
 
     # Incorporate biomarkers into risk scoring
     risk_score = result.get("risk_score", 0)
@@ -76,6 +77,7 @@ async def analyze_blood_slide(
         "image_path": img_filename,
         "patient_id": patient_info.get("patient_id"),
         "patient_name": patient_info.get("name"),
+        "created_at": prediction.created_at,
     }
 
 

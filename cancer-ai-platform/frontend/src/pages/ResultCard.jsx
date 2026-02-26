@@ -2,6 +2,49 @@ import { useState, useEffect } from "react";
 import { Badge } from "../components/Shared.jsx";
 import { generateReport } from "../api/reportApi.js";
 
+function _getRecommendations(cancerType, riskLevel, pClass) {
+    const isCritical = riskLevel === "CRITICAL" || riskLevel === "HIGH";
+    const recs = {
+        lung: [
+            { icon: "⚡", title: "Recommended Action", desc: isCritical ? "Schedule PET-CT scan within 7 days. Refer to thoracic oncologist. Consider CT-guided biopsy." : "Follow-up low-dose CT in 6 months. Monitor for symptom changes.", color: "#ff4444" },
+            { icon: "💊", title: "Treatment Pathway", desc: isCritical ? "Staging workup required. Lobectomy + adjuvant chemotherapy may be indicated. Pembrolizumab if PD-L1 > 50%." : "Continue routine LDCT screening. Annual follow-up as per guidelines.", color: "#ff8c00" },
+            { icon: "📊", title: "Prognosis Estimate", desc: isCritical ? "5-year survival depends on staging. Early-stage: 68-92%. Molecular profiling recommended for targeted therapy." : "Low-risk findings. 5-year survival >90% with surveillance.", color: "#c084fc" },
+            { icon: "🔄", title: "ChronoScan Follow-up", desc: isCritical ? "Serial imaging recommended to assess volume doubling time. RECIST criteria for response monitoring." : "Re-scan in 6-12 months. Track nodule size and morphology.", color: "#00b4ff" },
+        ],
+        brain: [
+            { icon: "⚡", title: "Recommended Action", desc: isCritical ? "Urgent neurosurgical consultation. MRI with contrast. Consider stereotactic biopsy." : "Follow-up MRI in 3-6 months with contrast.", color: "#ff4444" },
+            { icon: "💊", title: "Treatment Pathway", desc: isCritical ? "Maximal safe resection + Stupp protocol (temozolomide + radiation). Check IDH/MGMT status." : "Observation with serial MRI. Monitor for growth or symptom progression.", color: "#ff8c00" },
+            { icon: "📊", title: "Molecular Profile", desc: isCritical ? "IDH mutation and MGMT methylation testing recommended. 1p/19q codeletion for oligodendroglioma." : "Low-grade features. Consider watchful waiting with serial imaging.", color: "#c084fc" },
+            { icon: "🔄", title: "ChronoScan Follow-up", desc: "Serial volumetric MRI for growth assessment. Perfusion MRI to evaluate vascularity.", color: "#00b4ff" },
+        ],
+        breast: [
+            { icon: "⚡", title: "Recommended Action", desc: isCritical ? "Core needle biopsy recommended. Breast MRI for extent assessment. Refer to breast surgeon." : "Short-interval follow-up mammography in 6 months.", color: "#ff4444" },
+            { icon: "💊", title: "Treatment Pathway", desc: isCritical ? "Hormonal receptor, HER2, Ki-67 testing. Lumpectomy vs mastectomy. Consider neoadjuvant therapy." : "Continue routine screening per guidelines. Annual mammography.", color: "#ff8c00" },
+            { icon: "📊", title: "Risk Assessment", desc: isCritical ? "BI-RADS classification suggests high suspicion. Genetic counseling for BRCA testing if family history." : "Low suspicion lesion. Likely benign features.", color: "#c084fc" },
+            { icon: "🔄", title: "ChronoScan Follow-up", desc: "Track morphology changes. Comparative imaging for interval assessment.", color: "#00b4ff" },
+        ],
+        blood: [
+            { icon: "⚡", title: "Recommended Action", desc: isCritical ? "Urgent hematology referral. Bone marrow biopsy. Flow cytometry analysis." : "Repeat CBC with differential in 2-4 weeks. Monitor blast percentage.", color: "#ff4444" },
+            { icon: "💊", title: "Treatment Pathway", desc: isCritical ? "Induction chemotherapy based on subtype. ALL: multi-agent protocol. AML: 7+3 regimen. CML: TKI therapy." : "Monitor with serial CBC. Watch for cytopenias or rising blast count.", color: "#ff8c00" },
+            { icon: "📊", title: "Lab Correlation", desc: isCritical ? "Cytogenetic analysis for risk stratification. MRD assessment for treatment monitoring." : "Current values within acceptable range. Continue monitoring.", color: "#c084fc" },
+            { icon: "🔄", title: "ChronoScan Follow-up", desc: "Serial peripheral smear analysis. Track blast percentage trend over time.", color: "#00b4ff" },
+        ],
+        bone: [
+            { icon: "⚡", title: "Recommended Action", desc: isCritical ? "Orthopedic oncology referral. MRI for soft-tissue extent. Consider CT-guided biopsy." : "Follow-up imaging in 3-6 months. Monitor for growth.", color: "#ff4444" },
+            { icon: "💊", title: "Treatment Pathway", desc: isCritical ? "Staging workup including bone scan and chest CT. Neoadjuvant chemotherapy if high-grade." : "Observation with serial imaging. Low suspicion for malignancy.", color: "#ff8c00" },
+            { icon: "📊", title: "Classification", desc: isCritical ? "Lodwick classification suggests aggressive lesion. Histological confirmation required." : "Lodwick IA pattern. Slow-growing, likely benign features.", color: "#c084fc" },
+            { icon: "🔄", title: "ChronoScan Follow-up", desc: "Serial imaging for growth assessment. Track margin characteristics.", color: "#00b4ff" },
+        ],
+        skin: [
+            { icon: "⚡", title: "Recommended Action", desc: isCritical ? "Dermatology referral for dermoscopic evaluation. Excisional biopsy recommended." : "Monitor lesion with serial dermoscopy. Photo documentation.", color: "#ff4444" },
+            { icon: "💊", title: "Treatment Pathway", desc: isCritical ? "Wide local excision with margins. Sentinel lymph node biopsy if >1mm depth. Immunotherapy if advanced." : "Observation. Re-evaluate in 3-6 months.", color: "#ff8c00" },
+            { icon: "📊", title: "ABCDE Assessment", desc: isCritical ? "Asymmetry, border irregularity, color variation, diameter >6mm, evolution noted." : "Features within normal limits. Low suspicion by ABCDE criteria.", color: "#c084fc" },
+            { icon: "🔄", title: "ChronoScan Follow-up", desc: "Serial imaging for morphological change. Full-body skin screening recommended.", color: "#00b4ff" },
+        ],
+    };
+    return recs[cancerType] || recs.lung;
+}
+
 export default function ResultCard({ onNavigate, analysisResult }) {
     const [tab, setTab] = useState("risk");
     const [report, setReport] = useState(null);
@@ -15,17 +58,24 @@ export default function ResultCard({ onNavigate, analysisResult }) {
     const pId = r.patient_id || "PT-0041";
     const pAge = r.patient_age || 54;
 
+    const probs = r.probabilities || {};
+    const cancerType = r.cancer_type || "lung";
+    const cancerLabel = { lung: "Lung Cancer", brain: "Brain Tumor", breast: "Breast Cancer", blood: "Blood Cancer", bone: "Bone Cancer", skin: "Skin Cancer" }[cancerType] || "Cancer";
+    const cancerColor = { lung: "#ff4444", brain: "#00b4ff", breast: "#ff6b9d", blood: "#ff6b6b", bone: "#ffd93d", skin: "#ff8c00" }[cancerType] || "#ff4444";
+    const gradeMap = {
+        lung: riskScore > 70 ? "LungRADS 4B" : riskScore > 40 ? "LungRADS 4A" : "LungRADS 3",
+        brain: riskScore > 70 ? "WHO Grade III-IV" : riskScore > 40 ? "WHO Grade II" : "WHO Grade I",
+        breast: riskScore > 70 ? "BI-RADS 5" : riskScore > 40 ? "BI-RADS 4" : "BI-RADS 3",
+        blood: riskScore > 70 ? "Blast >20%" : riskScore > 40 ? "Blast 5-20%" : "Blast <5%",
+        bone: riskScore > 70 ? "Lodwick III" : riskScore > 40 ? "Lodwick II" : "Lodwick IA",
+        skin: riskScore > 70 ? "ABCDE High" : riskScore > 40 ? "ABCDE Moderate" : "ABCDE Low",
+    };
     const modelScores = [
-        { name: "Lung Cancer", score: r.cancer_type === "lung" ? riskScore : 12, color: "#ff4444", grade: r.cancer_type === "lung" ? `LungRADS 4B` : "Low Risk" },
-        { name: "Brain Tumor", score: r.cancer_type === "brain" ? riskScore : 12, color: "#00b4ff", grade: "WHO Grade I" },
-        { name: "Blood Cancer", score: r.cancer_type === "blood" ? riskScore : 8, color: "#ff6b6b", grade: "Blast < 5%" },
-        { name: "Bone Cancer", score: r.cancer_type === "bone" ? riskScore : 5, color: "#ffd93d", grade: "Lodwick IA" },
+        { name: cancerLabel, score: riskScore, color: cancerColor, grade: gradeMap[cancerType] || "N/A" },
     ];
     const tabs = [
         { id: "risk", label: "Risk Dashboard" },
-        { id: "report", label: "Clinical Report" },
-        { id: "accuracy", label: "Model Accuracy" },
-        { id: "validation", label: "Validation" },
+        { id: "report", label: "Clinical Report" }
     ];
 
     useEffect(() => {
@@ -39,9 +89,9 @@ export default function ResultCard({ onNavigate, analysisResult }) {
     const defaultSections = [
         { label: "CLINICAL INDICATION", text: `${pAge}-year-old presenting for ${r.cancer_type || "lung"} cancer screening. AI-assisted analysis requested.` },
         { label: "TECHNIQUE", text: `AI inference: ${r.cancer_type || "Lung"} cancer model. Grad-CAM heatmap overlay applied.` },
-        { label: "FINDINGS", text: `${pClass} detected with ${conf}% confidence. Risk score: ${riskScore}%.` },
-        { label: "IMPRESSION", text: `${pClass} detected. Risk Level: ${riskLevel}. Clinical correlation recommended.` },
-        { label: "RECOMMENDATION", text: `1. Specialist referral. 2. Additional imaging. 3. Consider biopsy. 4. Molecular profiling if confirmed.` },
+        { label: "FINDINGS", text: `${pClass !== "normal" ? pClass : "No abnormalities"} detected with ${conf}% confidence. Risk score: ${riskScore}%.` },
+        { label: "IMPRESSION", text: `${pClass !== "normal" ? pClass : "Normal scan"}. Risk Level: ${riskLevel}. ${riskLevel === "CRITICAL" ? "Clinical correlation recommended." : "Routine follow-up."}` },
+        { label: "RECOMMENDATION", text: riskLevel === "CRITICAL" ? `1. Specialist referral. 2. Additional imaging. 3. Consider biopsy. 4. Molecular profiling if confirmed.` : "Routine screening." },
     ];
 
     const reportSections = report?.sections
@@ -94,12 +144,7 @@ export default function ResultCard({ onNavigate, analysisResult }) {
                         </div>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                        {[
-                            { icon: "⚡", title: "Immediate Action Required", desc: "Schedule PET-CT scan within 7 days. Refer to thoracic oncologist. Consider CT-guided biopsy.", color: "#ff4444" },
-                            { icon: "💊", title: "Treatment Pathway", desc: "Stage IIB protocol. Lobectomy + adjuvant chemotherapy. Pembrolizumab if PD-L1 > 50%.", color: "#ff8c00" },
-                            { icon: "📊", title: "Survival Prognosis (DeepSurv)", desc: "1yr: 74% · 3yr: 48% · 5yr: 31% with treatment. Stage-adjusted Cox model confidence: 89%.", color: "#c084fc" },
-                            { icon: "🔄", title: "ChronoScan Follow-up", desc: "Nodule volume +38% vs. 3-month prior scan. VDT: 142 days. RECIST: Progressive Disease.", color: "#00b4ff" },
-                        ].map(rec => (
+                        {_getRecommendations(cancerType, riskLevel, pClass).map(rec => (
                             <div key={rec.title} style={{ padding: "16px 18px", border: `1px solid ${rec.color}22`, borderRadius: 10, background: `${rec.color}05` }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                                     <span style={{ fontSize: 16 }}>{rec.icon}</span>
@@ -123,54 +168,6 @@ export default function ResultCard({ onNavigate, analysisResult }) {
                             <div key={s.label} style={{ marginBottom: 20 }}>
                                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#00ff8877", marginBottom: 5, letterSpacing: "0.1em" }}>{s.label}</div>
                                 <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#6a8a6a", lineHeight: 1.8, fontWeight: 300 }}>{s.text}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {tab === "accuracy" && (
-                <div style={{ animation: "fadeUp 0.4s ease both" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-                        {[
-                            { name: "Lung Cancer", acc: "97.8%", auc: "0.994", model: "DenseNet121 + YOLOv8", color: "#00ff88" },
-                            { name: "Brain Tumor", acc: "96.9%", auc: "0.989", model: "3D-UNet + ResNet50", color: "#00b4ff" },
-                            { name: "Breast Cancer", acc: "96.1%", auc: "0.981", model: "EfficientNetV2", color: "#ff6b9d" },
-                            { name: "Blood Cancer", acc: "99.1%", auc: "0.997", model: "EfficientNetB3 + XGB", color: "#ff4444" },
-                            { name: "Bone Cancer", acc: "94.7%", auc: "0.972", model: "EfficientNetB4", color: "#ffd93d" },
-                            { name: "Skin Cancer", acc: "97.2%", auc: "0.991", model: "EfficientNetV2 + ABCDE", color: "#ff8c00" },
-                        ].map((m, i) => (
-                            <div key={m.name} style={{ padding: 16, border: `1px solid ${m.color}22`, borderRadius: 10, background: `${m.color}05`, animation: `fadeUp 0.4s ${i * 0.07}s ease both` }}>
-                                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, color: m.color, marginBottom: 8 }}>{m.name}</div>
-                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div><div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: m.color, letterSpacing: "-1px" }}>{m.acc}</div><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#3a5a3a" }}>Accuracy</div></div>
-                                    <div style={{ textAlign: "right" }}><div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: m.color, letterSpacing: "-1px" }}>{m.auc}</div><div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#3a5a3a" }}>AUC-ROC</div></div>
-                                </div>
-                                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#2a4a2a" }}>{m.model}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {tab === "validation" && (
-                <div style={{ animation: "fadeUp 0.4s ease both" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                        {[
-                            { phase: "Phase 1", title: "Retrospective Study", desc: "12,000 archived cases. Sensitivity 96.8%, Specificity 97.9%.", status: "COMPLETE", color: "#00ff88" },
-                            { phase: "Phase 2", title: "Prospective Validation", desc: "3-site clinical trial · 2,400 patients. Non-inferiority margin p<0.001.", status: "IN PROGRESS", color: "#ffd93d" },
-                            { phase: "Phase 3", title: "Multi-Site Expansion", desc: "15 hospitals · DICOM standard compliance. HL7 FHIR integration.", status: "PLANNED", color: "#00b4ff" },
-                            { phase: "Phase 4", title: "Regulatory Pathway", desc: "FDA 510(k). CE Mark (EU). CDSCO India. HIPAA/GDPR compliant.", status: "PLANNED", color: "#c084fc" },
-                        ].map((p, i) => (
-                            <div key={p.phase} style={{ padding: 20, border: `1px solid ${p.color}22`, borderRadius: 10, background: `${p.color}05`, animation: `fadeUp 0.4s ${i * 0.1}s ease both` }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                                    <div>
-                                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: p.color + "88", marginBottom: 4, textTransform: "uppercase" }}>{p.phase}</div>
-                                        <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, color: "#e6edf3" }}>{p.title}</div>
-                                    </div>
-                                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 8, color: p.color, border: `1px solid ${p.color}44`, padding: "2px 8px", borderRadius: 3 }}>{p.status}</span>
-                                </div>
-                                <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#4a6a4a", lineHeight: 1.7 }}>{p.desc}</p>
                             </div>
                         ))}
                     </div>

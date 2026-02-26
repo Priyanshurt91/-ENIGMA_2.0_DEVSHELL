@@ -24,6 +24,9 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("✅ Database initialized")
 
+    # Log GPU info
+    _log_gpu_info()
+
     # Load AI models
     _load_models()
     logger.info("✅ AI models loaded")
@@ -48,6 +51,32 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info(f"🔴 {settings.APP_NAME} shutting down.")
+
+
+def _log_gpu_info():
+    """Log GPU availability for both PyTorch and TensorFlow."""
+    logger.info("─── GPU Diagnostics ───")
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            vram = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+            logger.info(f"🟢 PyTorch CUDA: {gpu_name} ({vram:.1f} GB VRAM)")
+        else:
+            logger.warning("🔴 PyTorch CUDA: NOT available — running on CPU")
+    except Exception as e:
+        logger.warning(f"PyTorch GPU check failed: {e}")
+
+    try:
+        import tensorflow as tf
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            logger.info(f"🟢 TensorFlow GPUs: {[g.name for g in gpus]}")
+        else:
+            logger.warning("🔴 TensorFlow: No GPU detected — running on CPU")
+    except Exception as e:
+        logger.warning(f"TensorFlow GPU check failed: {e}")
+    logger.info("───────────────────────")
 
 
 def _load_models():

@@ -3,6 +3,8 @@ Radiology Service — orchestrates image upload → model inference → GradCAM 
 """
 import os
 import uuid
+import time
+import asyncio
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -30,23 +32,29 @@ async def analyze_image(
     4. Save prediction to DB
     5. Return result
     """
+    t0 = time.time()
+
     # Save uploaded image
     img_id = str(uuid.uuid4())[:8]
     img_filename = f"{cancer_type}_{img_id}.png"
     img_path = os.path.join(settings.UPLOAD_DIR, img_filename)
     image.save(img_path)
 
-    # Select inference module
-    result = _run_inference(image, cancer_type)
+    # Run inference in a thread so it doesn't block the async event loop
+    t1 = time.time()
+    result = await asyncio.to_thread(_run_inference, image, cancer_type)
+    logger.info(f"⏱️ Inference took {time.time()-t1:.2f}s")
 
-    # Generate GradCAM heatmap
+    # Generate GradCAM heatmap (also in a thread)
     heatmap_path = None
     try:
         model = _get_model(cancer_type)
         if model is not None:
             heatmap_filename = f"heatmap_{cancer_type}_{img_id}.png"
             heatmap_path = os.path.join(settings.UPLOAD_DIR, heatmap_filename)
-            save_heatmap(image, model, heatmap_path)
+            t2 = time.time()
+            await asyncio.to_thread(save_heatmap, image, model, heatmap_path)
+            logger.info(f"⏱️ GradCAM took {time.time()-t2:.2f}s")
     except Exception as e:
         logger.warning(f"GradCAM failed: {e}")
 
@@ -58,8 +66,8 @@ async def analyze_image(
     prediction = Prediction(
         user_id=user_id,
         patient_id=patient_info.get("patient_id"),
-        patient_name=patient_info.get("name"),
-        patient_age=patient_info.get("age"),
+        patient_name=patient_info.get("patient_name"),
+        patient_age=patient_info.get("patient_age"),
         cancer_type=cancer_type,
         scan_type=scan_type,
         image_path=img_filename,
@@ -74,7 +82,7 @@ async def analyze_image(
     await db.flush()
     await db.refresh(prediction)
 
-    logger.info(f"Radiology analysis complete: {cancer_type}/{result['predicted_class']} ({result['confidence']}%)")
+    logger.info(f"✅ Radiology analysis complete in {time.time()-t0:.2f}s: {cancer_type}/{result['predicted_class']} ({result['confidence']}%)")
 
     return {
         "id": prediction.id,
@@ -88,8 +96,9 @@ async def analyze_image(
         "heatmap_path": heatmap_filename if heatmap_path else None,
         "image_path": img_filename,
         "patient_id": patient_info.get("patient_id"),
-        "patient_name": patient_info.get("name"),
-        "patient_age": patient_info.get("age"),
+        "patient_name": patient_info.get("patient_name"),
+        "patient_age": patient_info.get("patient_age"),
+        "created_at": prediction.created_at,
     }
 
 

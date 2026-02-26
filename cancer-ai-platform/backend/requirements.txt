@@ -16,6 +16,8 @@ passlib[bcrypt]>=1.7.4
 bcrypt>=4.0.0
 
 # AI / ML
+# For GPU acceleration (NVIDIA CUDA 12.4), install PyTorch separately:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 torch
 torchvision
 tensorflow

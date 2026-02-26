@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # ── Gemini ───────────────────────────────────────────
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-pro"
+    GEMINI_MODEL: str = "gemini-1.5-flash"
 
     # ── RAG ───────────────────────────────────────────────
     CHROMA_PERSIST_DIR: str = str(BASE_DIR / "chroma_db")

@@ -15,37 +15,103 @@ export default function NiftiViewer({ onNavigate, analysisResult }) {
     const patientLabel = r.patient_name ? `${r.patient_id || "PT"} · ${r.patient_name}` : "PT-0041 · Ananya Sharma";
     const finding = r.predicted_class || "Suspicious Nodule";
     const conf = r.confidence || 91;
+    const cancerType = r.cancer_type || "lung";
+    const scanType = r.scan_type || "ct";
+    const scanLabel = { ct: "CT · Axial", mri: "MRI · T1W", xray: "X-Ray · AP", pathology: "Pathology" }[scanType] || "CT · Axial";
+    const riskScore = r.risk_score || 0;
+    const riskLevel = r.risk_level || "LOW";
+
+    // Cancer-type specific finding details
+    const findingDetails = {
+        lung: { location: "RUL · Lung field", metric: "LungRADS", metricValue: riskScore > 70 ? "4B" : riskScore > 40 ? "4A" : "3", advice: riskScore > 70 ? "Biopsy advised" : "Follow-up recommended" },
+        brain: { location: "Cerebral hemisphere", metric: "WHO Grade", metricValue: riskScore > 70 ? "III-IV" : riskScore > 40 ? "II" : "I", advice: riskScore > 70 ? "Neurosurgical consult" : "MRI follow-up" },
+        breast: { location: "Breast tissue", metric: "BI-RADS", metricValue: riskScore > 70 ? "5" : riskScore > 40 ? "4" : "3", advice: riskScore > 70 ? "Biopsy recommended" : "Follow-up imaging" },
+        bone: { location: "Skeletal region", metric: "Lodwick", metricValue: riskScore > 70 ? "III" : riskScore > 40 ? "II" : "IA", advice: riskScore > 70 ? "Orthopedic oncology referral" : "Surveillance" },
+        skin: { location: "Skin lesion", metric: "ABCDE Score", metricValue: riskScore > 70 ? "High" : riskScore > 40 ? "Moderate" : "Low", advice: riskScore > 70 ? "Dermatology referral" : "Monitor changes" },
+        blood: { location: "Peripheral blood smear", metric: "Blast %", metricValue: riskScore > 70 ? ">20%" : riskScore > 40 ? "5-20%" : "<5%", advice: riskScore > 70 ? "Hematology urgent" : "CBC follow-up" },
+    };
+    const fd = findingDetails[cancerType] || findingDetails.lung;
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
         const W = canvas.width, H = canvas.height;
+
         ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-        const grd = ctx.createRadialGradient(W / 2, H / 2, 10, W / 2, H / 2, 130);
-        grd.addColorStop(0, "#2a3a2a"); grd.addColorStop(0.5, "#1a2a1a"); grd.addColorStop(1, "#000");
-        ctx.beginPath(); ctx.ellipse(W / 2 - 40, H / 2 + 10, 70 + Math.sin(slice * 0.15) * 5, 90, -0.2, 0, Math.PI * 2); ctx.fillStyle = grd; ctx.fill();
-        ctx.beginPath(); ctx.ellipse(W / 2 + 40, H / 2 + 10, 70 + Math.cos(slice * 0.15) * 5, 90, 0.2, 0, Math.PI * 2); ctx.fill();
-        const nx = W / 2 - 35, ny = H / 2 - 20;
-        if (overlay) {
-            const hg = ctx.createRadialGradient(nx, ny, 0, nx, ny, 38);
-            hg.addColorStop(0, "rgba(255,68,68,0.7)"); hg.addColorStop(0.4, "rgba(255,140,0,0.4)"); hg.addColorStop(0.7, "rgba(255,217,61,0.2)"); hg.addColorStop(1, "transparent");
-            ctx.beginPath(); ctx.arc(nx, ny, 38, 0, Math.PI * 2); ctx.fillStyle = hg; ctx.fill();
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, W, H);
+
+        // Load the actual uploaded image or heatmap
+        const img = new Image();
+        const imgUrl = r.heatmap_path && overlay
+            ? `http://localhost:8000/uploads/${r.heatmap_path}`
+            : r.image_path
+                ? `http://localhost:8000/uploads/${r.image_path}`
+                : null;
+
+        if (imgUrl) {
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                // Calculate dimensions to fit inside canvas while maintaining aspect ratio
+                const scale = Math.min(W / img.width, H / img.height);
+                const w = img.width * scale;
+                const h = img.height * scale;
+                const x = (W - w) / 2;
+                const y = (H - h) / 2;
+
+                ctx.drawImage(img, x, y, w, h);
+                drawOverlays(ctx, W, H);
+            };
+            img.onerror = () => {
+                // Fallback drawing if image fails to load
+                drawSimulated(ctx, W, H);
+                drawOverlays(ctx, W, H);
+            };
+            img.src = imgUrl;
+        } else {
+            drawSimulated(ctx, W, H);
+            drawOverlays(ctx, W, H);
         }
-        const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, 14 + Math.sin(slice * 0.2) * 2);
-        ng.addColorStop(0, "#fff"); ng.addColorStop(0.3, "#ccc"); ng.addColorStop(1, "#666");
-        ctx.beginPath(); ctx.arc(nx, ny, 14 + Math.sin(slice * 0.2) * 2, 0, Math.PI * 2); ctx.fillStyle = ng; ctx.fill();
-        ctx.strokeStyle = "rgba(0,255,136,0.5)"; ctx.lineWidth = 0.5; ctx.setLineDash([4, 4]);
-        ctx.beginPath(); ctx.moveTo(nx, 0); ctx.lineTo(nx, H); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, ny); ctx.lineTo(W, ny); ctx.stroke(); ctx.setLineDash([]);
-        ctx.strokeStyle = "#00ff88"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(nx, ny, 22, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = "#00ff88"; ctx.font = "bold 10px 'DM Mono', monospace";
-        ctx.fillText("NODULE", nx + 26, ny - 6); ctx.fillText(`Ø${(14 + Math.sin(slice * 0.2) * 2).toFixed(1)}mm`, nx + 26, ny + 8);
-        ctx.fillStyle = "rgba(0,255,136,0.7)"; ctx.font = "9px 'DM Mono', monospace";
-        ctx.fillText(`SLICE ${slice}/80`, 8, 16);
-        ctx.fillText(window_ === "lung" ? "HU -600/1200" : window_ === "mediastinum" ? "HU 40/400" : "HU 400/1800", 8, 28);
-    }, [slice, overlay, window_]);
+
+        function drawSimulated(ctx, W, H) {
+            const grd = ctx.createRadialGradient(W / 2, H / 2, 10, W / 2, H / 2, 130);
+            grd.addColorStop(0, "#2a3a2a"); grd.addColorStop(0.5, "#1a2a1a"); grd.addColorStop(1, "#000");
+            ctx.beginPath(); ctx.ellipse(W / 2 - 40, H / 2 + 10, 70 + Math.sin(slice * 0.15) * 5, 90, -0.2, 0, Math.PI * 2); ctx.fillStyle = grd; ctx.fill();
+            ctx.beginPath(); ctx.ellipse(W / 2 + 40, H / 2 + 10, 70 + Math.cos(slice * 0.15) * 5, 90, 0.2, 0, Math.PI * 2); ctx.fill();
+
+            const nx = W / 2 - 35, ny = H / 2 - 20;
+            if (overlay) {
+                const hg = ctx.createRadialGradient(nx, ny, 0, nx, ny, 38);
+                hg.addColorStop(0, "rgba(255,68,68,0.7)"); hg.addColorStop(0.4, "rgba(255,140,0,0.4)"); hg.addColorStop(0.7, "rgba(255,217,61,0.2)"); hg.addColorStop(1, "transparent");
+                ctx.beginPath(); ctx.arc(nx, ny, 38, 0, Math.PI * 2); ctx.fillStyle = hg; ctx.fill();
+            }
+            const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, 14 + Math.sin(slice * 0.2) * 2);
+            ng.addColorStop(0, "#fff"); ng.addColorStop(0.3, "#ccc"); ng.addColorStop(1, "#666");
+            ctx.beginPath(); ctx.arc(nx, ny, 14 + Math.sin(slice * 0.2) * 2, 0, Math.PI * 2); ctx.fillStyle = ng; ctx.fill();
+        }
+
+        function drawOverlays(ctx, W, H, imgX = 0, imgY = 0, imgW = W, imgH = H) {
+            // Center relative to the actual drawn image area
+            const nx = imgX + imgW / 2 - 25, ny = imgY + imgH / 2 - 10;
+
+            ctx.strokeStyle = "rgba(0,255,136,0.5)"; ctx.lineWidth = 0.5; ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(nx, 0); ctx.lineTo(nx, H); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, ny); ctx.lineTo(W, ny); ctx.stroke(); ctx.setLineDash([]);
+
+            // Only draw the targeting reticle if we're using the simulated image, 
+            // since the real heatmap already has the AI overlay
+            if (!imgUrl) {
+                ctx.strokeStyle = "#00ff88"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(nx, ny, 22, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = "#00ff88"; ctx.font = "bold 10px 'DM Mono', monospace";
+                ctx.fillText("NODULE", nx + 26, ny - 6); ctx.fillText(`Ø${(14 + Math.sin(slice * 0.2) * 2).toFixed(1)}mm`, nx + 26, ny + 8);
+            }
+
+            ctx.fillStyle = "rgba(0,255,136,0.7)"; ctx.font = "9px 'DM Mono', monospace";
+            ctx.fillText(`SLICE ${slice}/80`, 8, 16);
+            ctx.fillText(window_ === "lung" ? "HU -600/1200" : window_ === "mediastinum" ? "HU 40/400" : "HU 400/1800", 8, 28);
+        }
+    }, [slice, overlay, window_, r]);
 
     return (
         <div className="page-enter" style={{ minHeight: "100vh", padding: "40px 48px 180px", position: "relative", zIndex: 1 }}>
@@ -60,7 +126,7 @@ export default function NiftiViewer({ onNavigate, analysisResult }) {
                 <div style={{ border: "1px solid #0d1a0d", borderRadius: 10, overflow: "hidden", background: "#000", position: "relative" }}>
                     <canvas ref={canvasRef} width={520} height={400} style={{ width: "100%", height: "auto", display: "block" }} />
                     <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 14px", background: "linear-gradient(180deg, rgba(0,0,0,0.8), transparent)", display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#00ff88" }}>{patientLabel} · CT · Axial</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#00ff88" }}>{patientLabel} · {scanLabel}</span>
                         <span style={{ marginLeft: "auto", fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#3a5a3a" }}>ChronoScan v2.1</span>
                     </div>
                 </div>
@@ -93,11 +159,12 @@ export default function NiftiViewer({ onNavigate, analysisResult }) {
                         </div>
                     </div>
                     <div style={{ padding: 16, border: "1px solid #ff444444", borderRadius: 10, background: "rgba(255,68,68,0.04)" }}>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#ff444488", marginBottom: 8, textTransform: "uppercase" }}>AI Finding</div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#ff444488", marginBottom: 8, textTransform: "uppercase" }}>AI Finding — {cancerType.charAt(0).toUpperCase() + cancerType.slice(1)}</div>
                         <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#ff4444", marginBottom: 4 }}>{finding}</div>
                         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#5a3a3a", lineHeight: 1.7 }}>
-                            Diameter: ~14.3mm<br />Location: RUL · Slice {slice}<br />
-                            LungRADS: <span style={{ color: "#ff4444" }}>4B</span> · Biopsy advised<br />
+                            Location: {fd.location}<br />
+                            {fd.metric}: <span style={{ color: "#ff4444" }}>{fd.metricValue}</span> · {fd.advice}<br />
+                            Risk: <span style={{ color: riskScore > 70 ? "#ff4444" : riskScore > 40 ? "#ff8c00" : "#00ff88" }}>{riskLevel}</span> ({riskScore}%)<br />
                             Confidence: <span style={{ color: "#ff4444" }}>{conf}%</span>
                         </div>
                     </div>

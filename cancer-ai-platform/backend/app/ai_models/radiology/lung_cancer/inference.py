@@ -27,8 +27,8 @@ def predict(image: Image.Image) -> dict:
     predicted_class = CLASSES[pred_idx]
     confidence = float(probabilities[pred_idx]) * 100
 
-    # Risk score: higher if malignant
-    risk_score = float(probabilities[1]) * 100 if len(CLASSES) == 2 else confidence
+    # Risk score: based on P(nodule_malignant)
+    risk_score = float(probabilities[2]) * 100 if len(CLASSES) == 3 else float(probabilities[1]) * 100
 
     return {
         "predicted_class": predicted_class,

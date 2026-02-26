@@ -26,12 +26,23 @@ const GLOBAL_CSS = `
 `;
 
 export default function App() {
-    const [page, setPage] = useState("home");
-    const [analysisResult, setAnalysisResult] = useState(null);
+    const [page, setPage] = useState(() => {
+        return localStorage.getItem("chronoscan_page") || "home";
+    });
+    const [analysisResult, setAnalysisResult] = useState(() => {
+        const saved = localStorage.getItem("chronoscan_result");
+        return saved ? JSON.parse(saved) : null;
+    });
 
     function navigate(to) {
         setPage(to);
+        localStorage.setItem("chronoscan_page", to);
         window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function handleAnalysisComplete(data) {
+        setAnalysisResult(data);
+        localStorage.setItem("chronoscan_result", JSON.stringify(data));
     }
 
     return (
@@ -44,7 +55,7 @@ export default function App() {
                 <div style={{ position: "fixed", bottom: "20%", right: "5%", width: 400, height: 400, background: "radial-gradient(ellipse, rgba(0,180,255,0.04) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
 
                 {page === "home" && <HomeScreen onNext={() => navigate("analyze")} />}
-                {page === "analyze" && <AnalyzeScreen onNavigate={navigate} onAnalysisComplete={(data) => setAnalysisResult(data)} />}
+                {page === "analyze" && <AnalyzeScreen onNavigate={navigate} onAnalysisComplete={handleAnalysisComplete} />}
                 {page === "nifti" && <NiftiViewer onNavigate={navigate} analysisResult={analysisResult} />}
                 {page === "result" && <ResultCard onNavigate={navigate} analysisResult={analysisResult} />}
 

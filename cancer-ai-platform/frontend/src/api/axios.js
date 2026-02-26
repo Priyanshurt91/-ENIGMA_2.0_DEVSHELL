@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "/api/v1",
-    headers: { "Content-Type": "application/json" },
+    baseURL: process.env.NODE_ENV === "production" ? "/api/v1" : "http://localhost:8000/api/v1",
+    timeout: 60000, // 60 second timeout — prevents UI hanging forever if backend is slow
 });
 
 // Attach JWT token to every request
