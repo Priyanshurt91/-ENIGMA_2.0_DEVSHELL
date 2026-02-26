@@ -1,6 +1,3 @@
-"""
-Dashboard Service — aggregates stats, risk distribution, recent predictions.
-"""
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -15,10 +12,10 @@ async def get_stats(db: AsyncSession) -> dict:
     total_reports = (await db.execute(select(func.count(Report.id)))).scalar() or 0
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
 
-    # Average confidence
+ 
     avg_confidence = (await db.execute(select(func.avg(Prediction.confidence)))).scalar() or 0
 
-    # Risk distribution
+
     risk_dist = {}
     for level in ["LOW", "MODERATE", "HIGH", "CRITICAL"]:
         count = (await db.execute(
@@ -26,7 +23,6 @@ async def get_stats(db: AsyncSession) -> dict:
         )).scalar() or 0
         risk_dist[level] = count
 
-    # Per cancer type stats
     cancer_stats = []
     for ct in ["lung", "brain", "blood", "bone", "skin", "breast"]:
         count = (await db.execute(
