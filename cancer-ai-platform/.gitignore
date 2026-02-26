@@ -1,0 +1,54 @@
+# ── Dependencies ─────────────────────────────────
+frontend/node_modules/
+backend/.venv/
+.venv/
+
+# ── Environment / Secrets ────────────────────────
+.env
+.env.local
+.env.production
+
+# ── Python cache ─────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ── Database files ───────────────────────────────
+*.db
+*.sqlite3
+
+# ── AI Model weights (too large for git) ─────────
+models_storage/**/*.pt
+models_storage/**/*.pth
+models_storage/**/*.h5
+models_storage/**/*.onnx
+models_storage/**/*.bin
+models_storage/**/*.safetensors
+
+# ── ChromaDB vector store ────────────────────────
+chroma_db/
+
+# ── Uploaded files ───────────────────────────────
+uploads/*
+!uploads/.gitkeep
+
+# ── Logs ─────────────────────────────────────────
+backend/logs/
+*.log
+
+# ── Build artifacts ──────────────────────────────
+frontend/dist/
+frontend/build/
+
+# ── IDE / Editor ─────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS files ─────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
