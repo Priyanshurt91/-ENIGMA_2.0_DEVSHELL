@@ -186,26 +186,3 @@ Sentence Transformers (Embeddings)
 LLM
 
 Gemini API (Google Generative AI)
-
-📂 Project Structure
-multi-cancer-ai-system/
-│
-├── frontend/
-│   ├── src/
-│   └── public/
-│
-├── backend/
-│   ├── main.py
-│   ├── models/                # .pt and .h5 files
-│   ├── gradcam/               # Heatmap generation
-│   ├── rag/
-│   │    ├── chroma_db/
-│   │    └── retriever.py
-│   ├── llm/
-│   │    └── gemini_report.py
-│   ├── routes/
-│   └── utils/
-│
-├── datasets/
-├── requirements.txt
-└── README.md
