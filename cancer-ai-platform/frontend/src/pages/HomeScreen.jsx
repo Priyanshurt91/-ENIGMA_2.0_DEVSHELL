@@ -59,7 +59,7 @@ export default function HomeScreen({ onNext }) {
                         <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #00ff88, #00b4ff)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <span style={{ fontSize: 16 }}>◎</span>
                         </div>
-                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18, color: "#e6edf3", letterSpacing: "-0.02em" }}>ChronoScan</span>
+                        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18, color: "#e6edf3", letterSpacing: "-0.02em" }}>CancerPre</span>
                         <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#3a4a3a", letterSpacing: "0.1em" }}>v2.1</span>
                     </div>
                     <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#3a5a3a", letterSpacing: "0.08em" }}>EARLY CANCER DETECTION SYSTEM · AI-POWERED MEDICAL IMAGING</p>
