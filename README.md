@@ -20,15 +20,15 @@ FastAPI (Backend)
 
 🔄 Complete System Workflow
 Image Upload
-      ↓
+      ->
 Model Inference (.pt / .h5)
-      ↓
+      ->
 Grad-CAM Heatmap Generation
-      ↓
+      ->
 RAG (ChromaDB Medical Knowledge Retrieval)
-      ↓
+      ->
 Gemini API (Clinical Report Generation)
-      ↓
+      ->
 Final Result Display (Prediction + Heatmap + AI Report)
 🧠 AI Models Used
 1️⃣ Blood Cancer Detection
@@ -132,17 +132,17 @@ Clinical disclaimer
 
 🏗️ System Architecture
 React Frontend
-      ↓
+      ->
 FastAPI Backend
-      ↓
+      ->
 Model Layer (.pt/.h5)
-      ↓
+      ->
 Grad-CAM Engine
-      ↓
+      -> 
 ChromaDB (RAG)
-      ↓
+      ->
 Gemini API
-      ↓
+      ->
 Frontend Result Display
 🌐 Tech Stack
 Frontend
