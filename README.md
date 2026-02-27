@@ -186,3 +186,12 @@ Sentence Transformers (Embeddings)
 LLM
 
 Gemini API (Google Generative AI)
+Project Interface
+<img width="1599" height="715" alt="image" src="https://github.com/user-attachments/assets/afdc4287-ff6d-4ede-b0be-076ec10b773d" />
+<img width="1591" height="713" alt="image" src="https://github.com/user-attachments/assets/69061c78-40e5-4e3e-b698-2b2a68024fba" />
+<img width="1590" height="690" alt="image" src="https://github.com/user-attachments/assets/251ab58d-fdf7-4911-9f02-8cbde3196234" />
+<img width="1588" height="529" alt="image" src="https://github.com/user-attachments/assets/8ff89849-da8b-4a0f-915f-a38a0bfd2434" />
+
+
+
+
