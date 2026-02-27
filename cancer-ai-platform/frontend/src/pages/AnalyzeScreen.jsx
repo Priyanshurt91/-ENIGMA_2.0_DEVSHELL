@@ -8,6 +8,7 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
     const [uploadState, setUploadState] = useState("idle");
     const [progress, setProgress] = useState(0);
     const [errorMsg, setErrorMsg] = useState("");
+    const [fromCache, setFromCache] = useState(false);
     const progressIntervalRef = useRef(null);
     const [selectedFile, setSelectedFile] = useState(null);
     const [patientInfo, setPatientInfo] = useState({ patient_id: "", patient_name: "", patient_age: "" });
@@ -30,6 +31,7 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
         setUploadState("uploading");
         setProgress(0);
         setErrorMsg("");
+        setFromCache(false);
 
         // Phase 1: 0 → 40% (upload phase)
         let p = 0;
@@ -62,6 +64,7 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
             if (p2 >= 90) clearInterval(progressIntervalRef.current);
         }, 120);
 
+        const t0 = Date.now();
         try {
             let res;
             if (selectedType === "blood") {
@@ -70,7 +73,17 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
                 res = await analyzeRadiology(selectedFile, selectedType, scanTypeMap[selectedType], finalPatientInfo);
             }
             clearInterval(progressIntervalRef.current);
-            setProgress(100);
+
+            const elapsed = Date.now() - t0;
+            const isCacheHit = res.data?.from_cache === true || elapsed < 1200;
+            setFromCache(isCacheHit);
+
+            // If cache hit: jump instantly
+            if (isCacheHit) {
+                setProgress(100);
+            } else {
+                setProgress(100);
+            }
             setUploadState("done");
             if (onAnalysisComplete) onAnalysisComplete(res.data);
         } catch (err) {
@@ -172,7 +185,7 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
                                     {uploadState === "uploading" ? "Uploading scan..." : "AI Inference running..."}
                                 </div>
                                 <div style={{ height: 4, background: "#0d1a0d", borderRadius: 2, overflow: "hidden", margin: "0 20px" }}>
-                                    <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg, #00ff88, #00b4ff)", borderRadius: 2, transition: "width 0.3s ease" }} />
+                                    <div style={{ height: "100%", width: `${progress}%`, background: fromCache ? "linear-gradient(90deg, #ffd93d, #ff8c00)" : "linear-gradient(90deg, #00ff88, #00b4ff)", borderRadius: 2, transition: "width 0.3s ease" }} />
                                 </div>
                                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#3a5a3a", marginTop: 6 }}>{Math.round(progress)}%</div>
                             </div>
@@ -190,9 +203,16 @@ export default function AnalyzeScreen({ onNavigate, onAnalysisComplete }) {
                         )}
                         {uploadState === "done" && (
                             <div>
-                                <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
-                                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#00ff88" }}>Analysis Complete!</div>
-                                <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "center" }}>
+                                <div style={{ fontSize: 28, marginBottom: 8 }}>{fromCache ? "⚡" : "✓"}</div>
+                                {fromCache ? (
+                                    <>
+                                        <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#ffd93d", marginBottom: 4 }}>Cache Hit — Loaded Instantly!</div>
+                                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#a07a00", marginBottom: 12 }}>This scan was previously analyzed. Result served from cache.</div>
+                                    </>
+                                ) : (
+                                    <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#00ff88", marginBottom: 12 }}>Analysis Complete!</div>
+                                )}
+                                <div style={{ display: "flex", gap: 10, marginTop: 8, justifyContent: "center" }}>
                                     <button onClick={() => onNavigate("nifti")} style={{ padding: "8px 16px", background: "rgba(0,180,255,0.12)", border: "1px solid #00b4ff44", borderRadius: 6, color: "#00b4ff", fontFamily: "'DM Mono', monospace", fontSize: 11, cursor: "pointer" }}>→ NiftiViewer</button>
                                     <button onClick={() => onNavigate("result")} style={{ padding: "8px 16px", background: "rgba(192,132,252,0.12)", border: "1px solid #c084fc44", borderRadius: 6, color: "#c084fc", fontFamily: "'DM Mono', monospace", fontSize: 11, cursor: "pointer" }}>→ ResultCard</button>
                                 </div>
