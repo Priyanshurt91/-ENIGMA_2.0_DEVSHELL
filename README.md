@@ -193,5 +193,11 @@ Project Interface
 <img width="1588" height="529" alt="image" src="https://github.com/user-attachments/assets/8ff89849-da8b-4a0f-915f-a38a0bfd2434" />
 
 
+System Architecture
+
+<img width="1719" height="347" alt="image" src="https://github.com/user-attachments/assets/b7c5c8f4-68a8-4951-9a43-888a73b7a68c" />
+
+
+
 
 
